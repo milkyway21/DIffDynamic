@@ -56,11 +56,17 @@ def run_git_command(cmd, check=True):
             cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
-            encoding='utf-8'
+            encoding='utf-8',
+            errors='ignore'  # 忽略编码错误
         )
         if check and result.returncode != 0:
             print(f"错误: Git命令执行失败: {cmd}")
-            print(f"错误信息: {result.stderr}")
+            if result.stderr:
+                try:
+                    error_msg = result.stderr.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+                    print(f"错误信息: {error_msg}")
+                except:
+                    print("错误信息: (无法显示)")
             return False
         return result
     except Exception as e:
@@ -81,6 +87,28 @@ def init_git_repo():
     else:
         print("[ERROR] Git仓库初始化失败")
         return False
+
+def check_git_config():
+    """检查Git用户配置"""
+    print("检查Git用户配置...")
+    email_result = run_git_command('git config user.email', check=False)
+    name_result = run_git_command('git config user.name', check=False)
+    
+    if not email_result or not email_result.stdout.strip():
+        print("[WARNING] Git用户邮箱未配置")
+        print("请运行以下命令配置:")
+        print('  git config --global user.email "your-email@example.com"')
+        print('  git config --global user.name "Your Name"')
+        return False
+    
+    if not name_result or not name_result.stdout.strip():
+        print("[WARNING] Git用户名未配置")
+        print("请运行以下命令配置:")
+        print('  git config --global user.name "Your Name"')
+        return False
+    
+    print(f"[OK] Git用户配置: {name_result.stdout.strip()} <{email_result.stdout.strip()}>")
+    return True
 
 def setup_remote():
     """设置远程仓库"""
@@ -168,8 +196,12 @@ def add_files_to_git(files):
             print(f"[OK] 已添加 {min(i+batch_size, len(files))}/{len(files)} 个文件")
         else:
             print(f"[ERROR] 添加文件时出错 (批次 {i//batch_size + 1})")
-            if result:
-                print(f"错误信息: {result.stderr}")
+            if result and result.stderr:
+                try:
+                    error_msg = result.stderr.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+                    print(f"错误信息: {error_msg}")
+                except:
+                    print("错误信息: (无法显示)")
     
     return True
 
@@ -191,8 +223,12 @@ def commit_and_push():
         print("[OK] 提交成功")
     else:
         print("[ERROR] 提交失败")
-        if result:
-            print(f"错误信息: {result.stderr}")
+        if result and result.stderr:
+            try:
+                error_msg = result.stderr.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+                print(f"错误信息: {error_msg}")
+            except:
+                print("错误信息: (无法显示)")
         return False
     
     # 推送到GitHub
@@ -206,8 +242,12 @@ def commit_and_push():
         return True
     else:
         print("[ERROR] 推送失败")
-        if result:
-            print(f"错误信息: {result.stderr}")
+        if result and result.stderr:
+            try:
+                error_msg = result.stderr.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+                print(f"错误信息: {error_msg}")
+            except:
+                print("错误信息: (无法显示)")
         print("\n提示: 如果这是第一次推送，可能需要:")
         print("  1. 确保GitHub仓库已创建")
         print("  2. 配置GitHub认证 (使用Personal Access Token)")
@@ -225,24 +265,35 @@ def main():
         print("无法初始化Git仓库，退出")
         return 1
     
-    # 2. 设置远程仓库
+    # 2. 检查Git配置
+    if not check_git_config():
+        print("\n[WARNING] Git用户信息未配置，将无法提交")
+        print("您可以先配置Git用户信息，然后手动执行:")
+        print('  git config --global user.email "your-email@example.com"')
+        print('  git config --global user.name "Your Name"')
+        print("然后重新运行此脚本，或手动执行:")
+        print("  git commit -m 'Upload files smaller than 10MB'")
+        print("  git push -u origin main")
+        return 1
+    
+    # 3. 设置远程仓库
     if not setup_remote():
         print("无法设置远程仓库，退出")
         return 1
     
-    # 3. 查找小文件
+    # 4. 查找小文件
     small_files = find_small_files()
     
     if not small_files:
         print("没有找到需要上传的文件")
         return 0
     
-    # 4. 添加文件到Git
+    # 5. 添加文件到Git
     if not add_files_to_git(small_files):
         print("添加文件失败")
         return 1
     
-    # 5. 提交并推送
+    # 6. 提交并推送
     if not commit_and_push():
         print("提交或推送失败，但文件已添加到Git暂存区")
         print("您可以手动执行以下命令:")
