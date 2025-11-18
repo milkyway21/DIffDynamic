@@ -1,0 +1,36 @@
+model:  # 推断时使用的模型配置
+  checkpoint: ./pretrained_models/pretrained_diffusion.pt
+
+sample:  # 采样阶段的参数设置
+  seed: 2021  # 随机种子，保证结果可复现
+  num_samples: 100  # 生成样本数量
+  num_steps: 1000  # 扩散步数
+  pos_only: False  # 是否仅更新坐标
+  center_pos_mode: protein  # 采样时的中心化策略
+  sample_num_atoms: prior  # 原子数量来源（先验或预测）
+  mode: dynamic  # 采样模式（支持 dynamic/legacy 等）
+  dynamic:  # 动态采样的细节配置
+    method: auto  # ['auto', 'unified', 'legacy'] 自动选择策略
+    large_step:  # 大步探索阶段配置
+      schedule: lambda  # 步长调度类型
+      batch_size: 16  # 每轮处理的候选数量（针对16GB显存优化，从32降至16）
+      stride: 50  # 时间步之间的间隔
+      step_size: 1.0  # 更新步幅
+      n_repeat: 4  # 重复次数
+      noise_scale: 0.0  # 额外噪声强度
+      time_lower: 500  # 大步阶段的最小时间步
+    refine:  # 精炼阶段配置
+      schedule: lambda  # 调度类型
+      stride: 10  # 时间步间隔
+      step_size: 0.2  # 精炼步幅
+      time_upper: 500  # 精炼起始时间步
+      time_lower: 0  # 精炼结束时间步
+      cycles: 1  # 重复精炼的轮数
+      n_sampling: 2  # 精炼阶段采样次数（针对16GB显存优化，从3降至2）
+      noise_scale: 0.0  # 额外噪声
+    selector:  # 候选筛选策略
+      top_n: 12  # 保留的候选数量（针对16GB显存优化，从16降至12）
+      min_qed: 0.0  # 最小 QED 阈值
+      max_sa: 6.0  # 最大 SA 分数
+      qed_weight: 1.0  # QED 权重
+      sa_weight: 1.0  # SA 权重
